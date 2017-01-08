@@ -11,7 +11,6 @@ use Adldap\Adldap;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Monolog\Logger;
-use Setting;
 use Validator;
 
 class EloquentLDAPUserProvider implements UserProvider
@@ -50,6 +49,14 @@ class EloquentLDAPUserProvider implements UserProvider
     protected $group_model;
 
     /**
+     * Shortcut to the config section.
+     *
+     * @var Array
+     */
+
+    protected $ldapConfig;
+
+    /**
      * The connection options for LDAP.
      *
      * @var Array
@@ -67,8 +74,9 @@ class EloquentLDAPUserProvider implements UserProvider
     {
         $this->app = $app;
         $this->hasher = $this->app['hash'];
+        $this->ldapConfig = $this->app['config']['eloquent-ldap'];
         $this->user_model = $this->app['config']['auth.model'];
-        $this->group_model = Setting::get('eloquent-ldap.group_model');
+        $this->group_model = $this->ldapConfig['group_model'];
     }
 
     /**
@@ -142,8 +150,8 @@ class EloquentLDAPUserProvider implements UserProvider
         // we found, which could be a user or null.
         if (
              is_null($user) &&
-             Setting::get('eloquent-ldap.enabled') &&
-             Setting::get('eloquent-ldap.create_accounts')
+             $this->ldapConfig['enabled'] &&
+             $this->ldapConfig['create_accounts']
            ) {
             $user = $this->createUserFromLDAP($credentials['username']);
         }
@@ -168,20 +176,20 @@ class EloquentLDAPUserProvider implements UserProvider
         // method is enabled, try it.
         if ( isset($user) &&
              (
-                ( isset($user->auth_type) && (Setting::get('eloquent-ldap.label_internal') === $user->auth_type) ) ||
+                ( isset($user->auth_type) && ($this->ldapConfig['label_internal'] === $user->auth_type) ) ||
                 ( !isset($user->auth_type) )
              )
            ) {
             $plain = $credentials['password'];
             $credentialsValidated = $this->hasher->check($plain, $user->getAuthPassword());
-        } else if ( (Setting::get('eloquent-ldap.enabled')) && (Setting::get('eloquent-ldap.label_ldap') === $user->auth_type) ) {
+        } else if ( ($this->ldapConfig['enabled']) && ($this->ldapConfig['label_ldap'] === $user->auth_type) ) {
             // Validate credentials against LDAP/AD server.
             $credentialsValidated = $this->validateLDAPCredentials($credentials);
             // If validated and config set to resync group membership on login.
             if ( $credentialsValidated ) {
                 // Sync user enable/disable state
                 $this->syncEnable($user);
-                if ( (Setting::get('eloquent-ldap.resync_on_login')) && (Setting::get('eloquent-ldap.replicate_group_membership'))) {
+                if ($this->ldapConfig['resync_on_login']) {
                     // First, revoke membership to all groups marked to 'resync_on_login'.
                     $this->revokeMembership($user);
                     // Then replicate group membership.
@@ -261,9 +269,9 @@ class EloquentLDAPUserProvider implements UserProvider
         $ldapUserInfo = $this->getLDAPUserInfo($userName);
         // If we found the user in LDAP
         if (true == $ldapUserInfo ) {
-            $firstName = $this->GetArrayIndexedValueOrDefault($ldapUserInfo[0], Setting::get('eloquent-ldap.first_name_field'), 0, $userName);
-            $lastName  = $this->GetArrayIndexedValueOrDefault($ldapUserInfo[0], Setting::get('eloquent-ldap.last_name_field'), 0, '');
-            $email     = $this->GetArrayIndexedValueOrDefault($ldapUserInfo[0], Setting::get('eloquent-ldap.email_field'), 0, '');
+            $firstName = $this->GetArrayIndexedValueOrDefault($ldapUserInfo[0], $this->ldapConfig['first_name_field'], 0, $userName);
+            $lastName  = $this->GetArrayIndexedValueOrDefault($ldapUserInfo[0], $this->ldapConfig['last_name_field'], 0, '');
+            $email     = $this->GetArrayIndexedValueOrDefault($ldapUserInfo[0], $this->ldapConfig['email_field'], 0, '');
             $enabled   = (($ldapUserInfo[0]['useraccountcontrol'][0] & 2) == 0);
 
             $userModel = $this->createUserModel();
@@ -292,7 +300,7 @@ class EloquentLDAPUserProvider implements UserProvider
                     'last_name'  => $lastName,
                     'email'      => $email,
                     'password'   => 'Laravel Rock! ASP.Net blows! ' . date("Y-m-d H:i:s"),
-                    'auth_type'  => Setting::get('eloquent-ldap.label_ldap'),
+                    'auth_type'  => $this->ldapConfig['label_ldap'],
                 ));
 
                 if ($enabled) {
@@ -302,7 +310,7 @@ class EloquentLDAPUserProvider implements UserProvider
                 }
                 $user->save();
 
-                if (Setting::get('eloquent-ldap.replicate_group_membership')) {
+                if ($this->ldapConfig['replicate_group_membership']) {
                     $this->replicateMembershipFromLDAP($user);
                 }
             }
@@ -323,34 +331,34 @@ class EloquentLDAPUserProvider implements UserProvider
         if (!isset($this->ldapConOp) || is_null($this->ldapConOp)) {
             // Build basic LDAP connection configuration.
             $this->ldapConOp = [
-                "account_suffix"     => Setting::get('eloquent-ldap.account_suffix'),
-                "base_dn"            => Setting::get('eloquent-ldap.base_dn'),
-                "domain_controllers" => [ Setting::get('eloquent-ldap.server') ], // config item must be an array.
-                "admin_username"     => Setting::get('eloquent-ldap.user_name'),
-                "admin_password"     => Setting::get('eloquent-ldap.password'),
-                "real_primarygroup"  => Setting::get('eloquent-ldap.return_real_primary_group'),
-                "recursive_groups"   => Setting::get('eloquent-ldap.recursive_groups'),
-                "sso"                => false, // Setting::get('eloquent-ldap.sso'), // NOT SUPPORTED HARD CODED TO FALSE.
-                "follow_referrals"   => false, // Setting::get('eloquent-ldap.follow_referrals'), // NOT SUPPORTED HARD CODED TO FALSE.
+                "account_suffix"     => $this->ldapConfig['account_suffix'],
+                "base_dn"            => $this->ldapConfig['base_dn'],
+                "domain_controllers" => $this->ldapConfig['server'],
+                "admin_username"     => $this->ldapConfig['user_name'],
+                "admin_password"     => $this->ldapConfig['password'],
+                "real_primarygroup"  => $this->ldapConfig['return_real_primary_group'],
+                "recursive_groups"   => $this->ldapConfig['recursive_groups'],
+                "sso"                => false, // $ldapConfig['sso'], // NOT SUPPORTED HARD CODED TO FALSE.
+                "follow_referrals"   => false, // $ldapConfig['follow_referrals'], // NOT SUPPORTED HARD CODED TO FALSE.
             ];
             // Create the communication option part, add the encryption and port info.
-            if ('tls' === Setting::get('eloquent-ldap.secured')) {
+            if ('tls' === $this->ldapConfig['secured']) {
                 $comOpt = [
                     "use_ssl" => false,
                     "use_tls" => true,
-                    "ad_port" => Setting::get('eloquent-ldap.secured_port'), // TODO: Should this be secured_port or port?!?!
+                    "ad_port" => $this->ldapConfig['secured_port'], // TODO: Should this be secured_port or port?!?!
                 ];
-            } else if ('ssl' === Setting::get('eloquent-ldap.secured')) {
+            } else if ('ssl' === $this->ldapConfig['secured']) {
                 $comOpt = [
                     "use_ssl" => true,
                     "use_tls" => false,
-                    "ad_port" => Setting::get('eloquent-ldap.secured_port'),
+                    "ad_port" => $this->ldapConfig['secured_port'],
                 ];
             } else {
                 $comOpt = [
                     "use_ssl" => false,
                     "use_tls" => false,
-                    "ad_port" => Setting::get('eloquent-ldap.port'),
+                    "ad_port" => $this->ldapConfig['port'],
                 ];
             }
             // Merge all options together.
@@ -424,7 +432,7 @@ class EloquentLDAPUserProvider implements UserProvider
         $adResults = false;
 
         try {
-            $ldapQuery = Setting::get('eloquent-ldap.user_filter');
+            $ldapQuery = $this->ldapConfig['user_filter'];
             if (strpos($ldapQuery, self::USER_TOKEN)) {
                 $ldapQuery = str_replace(self::USER_TOKEN, $username, $ldapQuery);
             }
@@ -433,20 +441,17 @@ class EloquentLDAPUserProvider implements UserProvider
             }
 
             $ldapFields = [
-                Setting::get('eloquent-ldap.first_name_field'),
-                Setting::get('eloquent-ldap.last_name_field'),
-                Setting::get('eloquent-ldap.email_field'),
+                $this->ldapConfig['first_name_field'],
+                $this->ldapConfig['last_name_field'],
+                $this->ldapConfig['email_field'],
                 'useraccountcontrol',
-                'dn',
             ];
 
             // Build connection info.
             $ldapConOp = $this->GetLDAPConnectionOptions();
 
-            if (Setting::get('eloquent-ldap.debug')) {
-                // Set LDAP debug log level - useful in DEV, dangerous in PROD!!
-                ldap_set_option(NULL, LDAP_OPT_DEBUG_LEVEL, 7);
-            }
+//            // Set LDAP debug log level - useful in DEV, dangerous in PROD!!
+//            ldap_set_option(NULL, LDAP_OPT_DEBUG_LEVEL, 7);
 
             // Connect to AD/LDAP
             $adldap = new Adldap($ldapConOp);
@@ -516,12 +521,10 @@ class EloquentLDAPUserProvider implements UserProvider
         try {
             $groupModel = $this->createGroupModel();
             $ldapConOp = $this->GetLDAPConnectionOptions();
-            $ldapRecursive = Setting::get('eloquent-ldap.recursive_groups');
+            $ldapRecursive = $this->ldapConfig['recursive_groups'];
 
-            if (Setting::get('eloquent-ldap.debug')) {
-                // Set LDAP debug log level - useful in DEV, dangerous in PROD!!
-                ldap_set_option(NULL, LDAP_OPT_DEBUG_LEVEL, 7);
-            }
+//            // Set LDAP debug log level - useful in DEV, dangerous in PROD!!
+//            ldap_set_option(NULL, LDAP_OPT_DEBUG_LEVEL, 7);
 
             // Connect to AD/LDAP
             $adldap = new Adldap($ldapConOp);
@@ -573,22 +576,12 @@ class EloquentLDAPUserProvider implements UserProvider
             $userName     = $credentials['username'];
             $ldapConOp    = $this->GetLDAPConnectionOptions();
 
-            if (Setting::get('eloquent-ldap.debug')) {
-                // Set LDAP debug log level - useful in DEV, dangerous in PROD!!
-                ldap_set_option(NULL, LDAP_OPT_DEBUG_LEVEL, 7);
-            }
+    //            // Set LDAP debug log level - useful in DEV, dangerous in PROD!!
+    //            ldap_set_option(NULL, LDAP_OPT_DEBUG_LEVEL, 7);
 
             // Try to authenticate using AD/LDAP
             $adldap = new Adldap($ldapConOp);
-
-            // For LDAP servers, the authentication is done with the full DN,
-            // Not the username with the suffix as is done for MSAD servers.
-            if ('LDAP' === Setting::get('eloquent-ldap.server_type')) {
-                $ldapUserInfo = $this->getLDAPUserInfo($userName);
-                $userName = $this->GetArrayValueOrDefault($ldapUserInfo[0], 'dn', '');
-            }
-
-                $authUser = $adldap->authenticate($userName, $userPassword);
+            $authUser = $adldap->authenticate($userName, $userPassword);
             // If the user got authenticated
             if ($authUser == true) {
                 $credentialsValidated = true;

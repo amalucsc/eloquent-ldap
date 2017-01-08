@@ -59,98 +59,31 @@ The recommended way to configure this package is by defining the following
 variables in you `.env` file and adjusting the values there. For a 
 detailed explanation of each setting, refer to the config file 
 that you published above.
-
-The configuration that you will need will vary based on the type or server that you wish to authenticate against.
-Below are example config section for both options, Lightweight Directory Access Protocol (LDAP) and Microsoft 
-Active Directory (MSAD).
-
-### Microsoft Active Directory server.
-
-Below is a section of a ```.env``` config file that shows how to configure your system to access a Microsoft Active 
-Directory server:
-
 ```
-eloquent-ldap.enabled=true
-eloquent-ldap.debug=false
-eloquent-ldap.server_type=MSAD
-eloquent-ldap.create_accounts=true
-eloquent-ldap.replicate_group_membership=true
-eloquent-ldap.resync_on_login=true
-eloquent-ldap.group_model=App\Models\Role
-eloquent-ldap.label_internal=internal
-eloquent-ldap.label_ldap=ldap
-eloquent-ldap.account_suffix=@company.com
-eloquent-ldap.base_dn=DC=department,DC=company,DC=com
-eloquent-ldap.server=ldapsrv01.company.com
-eloquent-ldap.port=389
-eloquent-ldap.user_name=ldap_reader
-eloquent-ldap.password=PaSsWoRd
-eloquent-ldap.return_real_primary_group=true
-eloquent-ldap.secured=false
-eloquent-ldap.secured_port=636
-eloquent-ldap.recursive_groups=true
-eloquent-ldap.sso=false
-eloquent-ldap.username_field=samaccountname
-eloquent-ldap.email_field=userprincipalname
-eloquent-ldap.first_name_field=givenname
-eloquent-ldap.last_name_field=sn
-eloquent-ldap.user_filter=(&(objectcategory=person)(samaccountname=%username))
+LDAP_ENABLED=false
+LDAP_CREATE_ACCOUNTS=true
+LDAP_REPLICATE_GROUP_MEMBERSHIP=true
+LDAP_RESYNC_ON_LOGIN=true
+LDAP_GROUP_MODEL=App\Models\Group
+LDAP_LABEL_INTERNAL=internal
+LDAP_LABEL_LDAP=ldap
+LDAP_ACCOUNT_SUFFIX=@company.com
+LDAP_BASE_DN=DC=department,DC=company,DC=com
+LDAP_SERVER=ldapsrv01.company.com
+LDAP_PORT=389
+LDAP_USER_NAME=ldap_reader
+LDAP_PASSWORD=PaSsWoRd
+LDAP_RETURN_REAL_PRIMARY_GROUP=true
+LDAP_SECURED=false
+LDAP_SECURED_PORT=636
+LDAP_RECURSIVE_GROUPS=true
+LDAP_SSO=false
+LDAP_USERNAME_FIELD=samaccountname
+LDAP_EMAIL_FIELD=userprincipalname
+LDAP_FIRST_NAME_FIELD=givenname
+LDAP_LAST_NAME_FIELD=sn
+LDAP_USER_FILTER=(&(objectcategory=person)(samaccountname=%username))
 ```
-
-### Lightweight Directory Access Protocol server.
-
-Below is a section of a ```.env``` config file that shows how to configure your system to access a Lightweight 
-Directory Access Protocol server:
-
-```
-eloquent-ldap.enabled=true
-eloquent-ldap.debug=false
-eloquent-ldap.server_type=ldap
-eloquent-ldap.create_accounts=true
-eloquent-ldap.replicate_group_membership=false
-eloquent-ldap.resync_on_login=false
-eloquent-ldap.group_model=App\Models\Role
-eloquent-ldap.label_internal=internal
-eloquent-ldap.label_ldap=ldap
-eloquent-ldap.account_suffix=
-eloquent-ldap.base_dn=dc=example,dc=com
-eloquent-ldap.server=ldap.forumsys.com
-eloquent-ldap.port=389
-eloquent-ldap.user_name=cn=read-only-admin,dc=example,dc=com
-eloquent-ldap.password=password
-eloquent-ldap.return_real_primary_group=true
-eloquent-ldap.secured=false
-eloquent-ldap.secured_port=636
-eloquent-ldap.recursive_groups=true
-eloquent-ldap.sso=false
-eloquent-ldap.username_field=uid
-eloquent-ldap.email_field=mail
-eloquent-ldap.first_name_field=
-eloquent-ldap.last_name_field=sn
-eloquent-ldap.user_filter=(&(objectclass=person)(uid=%username))
-```
-
-**_NOTE:_** THe configuration options above will allow you to connect and authenticate users using the publicly 
-available OpenLDAP test server hosted by 
-[Forum Systems](http://www.forumsys.com/en/tutorials/integration-how-to/ldap/online-ldap-test-server/).
-
-### MSAD vs LDAP
-
-A couple of difference in how to configure the system depending on which server type is being used are worth pointing 
-out.
-
-* eloquent-ldap.server_type: Can be either LDAP or MSAD. Lets the system know how to interact with the authentication server.
-* eloquent-ldap.replicate_group_membership: Currently only supported for MSAD servers.
-* eloquent-ldap.resync_on_login: Currently only supported for MSAD servers.
-* eloquent-ldap.account_suffix:
-    * LDAP: Should remain empty for LDAP servers. 
-    * MSAD: Should contain the static part of the users email address.
-* eloquent-ldap.user_name:
-    * LDAP: Should be the complete DN of the user to bind with.
-    * MSAD: Simply the name of the user to bind with.
-* eloquent-ldap.return_real_primary_group:
-    * LDAP: Not used.
-    * MSAD: Fix Microsoft AD not following standards may incur extra processing.
 
 ## Usage
 

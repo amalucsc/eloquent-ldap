@@ -12,7 +12,7 @@
       "laravel"
     ],
     "homepage": "https://github.com/sroutier/eloquent-ldap",
-    "license": "GPL-3.0",
+    "license": "GPLv3",
     "authors": [
         {
             "name": "Sebastien Routier",
